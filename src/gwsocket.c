@@ -146,7 +146,7 @@ onopen (WSPipeOut * pipeout, WSClient * client)
   char *hdr = calloc (hsize, sizeof (char));
   char *ptr = hdr;
 
-  ptr += pack_uint32 (ptr, client->listener);
+  ptr += pack_uint32 (ptr, (uint32_t)client->listener);
   ptr += pack_uint32 (ptr, 0x10);
   ptr += pack_uint32 (ptr, INET6_ADDRSTRLEN);
 
@@ -164,7 +164,7 @@ onclose (WSPipeOut * pipeout, WSClient * client)
   char *hdr = calloc (hsize, sizeof (char));
   char *ptr = hdr;
 
-  ptr += pack_uint32 (ptr, client->listener);
+  ptr += pack_uint32 (ptr, (uint32_t)client->listener);
   ptr += pack_uint32 (ptr, 0x08);
   ptr += pack_uint32 (ptr, 0);
 
@@ -183,9 +183,9 @@ onmessage (WSPipeOut * pipeout, WSClient * client)
 
   hdr = calloc (hsize, sizeof (char));
   ptr = hdr;
-  ptr += pack_uint32 (ptr, client->listener);
+  ptr += pack_uint32 (ptr, (uint32_t)client->listener);
   ptr += pack_uint32 (ptr, (*msg)->opcode);
-  ptr += pack_uint32 (ptr, (*msg)->payloadsz);
+  ptr += pack_uint32 (ptr, (uint32_t)(*msg)->payloadsz);
 
   ws_write_fifo (pipeout, hdr, hsize);
   ws_write_fifo (pipeout, (*msg)->payload, (*msg)->payloadsz);

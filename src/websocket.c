@@ -98,7 +98,7 @@ static int shutdown_ssl (WSClient * client);
  *
  * The state after the by has been processed is returned. */
 static uint32_t
-verify_utf8 (uint32_t * state, const char *str, int len)
+verify_utf8 (uint32_t * state, const char *str, unsigned int len)
 {
   int i;
   uint32_t type;
@@ -123,7 +123,7 @@ utf8_decode (uint32_t * state, uint32_t * p, uint32_t b)
 {
   uint32_t type = utf8d[(uint8_t) b];
 
-  *p = (*state != UTF8_VALID) ? (b & 0x3fu) | (*p << 6) : (0xff >> type) & (b);
+  *p = (*state != UTF8_VALID) ? (b & 0x3fu) | (*p << 6) : ((uint32_t)0xff >> type) & (b);
   *state = utf8d[256 + *state * 16 + type];
 
   return *state;
@@ -133,13 +133,13 @@ utf8_decode (uint32_t * state, uint32_t * p, uint32_t b)
  *
  * On success, it replaces the whole sequence and return a malloc'd buffer. */
 static char *
-sanitize_utf8 (const char *str, int len)
+sanitize_utf8 (const char *str, unsigned int len)
 {
   char *buf = NULL;
   uint32_t state = UTF8_VALID, prev = UTF8_VALID, cp = 0;
   int i = 0, j = 0, k = 0, l = 0;
 
-  buf = xcalloc (len + 1, sizeof (char));
+  buf = xcalloc ((size_t)len + 1, sizeof (char));
   for (; i < len; prev = state, ++i) {
     switch (utf8_decode (&state, &cp, (unsigned char) str[i])) {
     case UTF8_INVAL:
@@ -286,7 +286,7 @@ escape_http_request (const char *src)
       if ((*p < ' ') || (*p >= 0177)) {
         /* not ASCII */
       } else {
-        *q++ = *p;
+        *q++ = (char)*p;
       }
       break;
     }
@@ -308,7 +308,7 @@ strtoupper (char *str)
     return str;
 
   while (*p != '\0') {
-    *p = toupper (*p);
+    *p = (char)toupper (*p);
     p++;
   }
 
@@ -441,7 +441,7 @@ ws_clear_queue (WSClient * client)
   (*queue) = NULL;
 
   /* done sending the whole queue, stop throttling */
-  client->status &= ~WS_THROTTLING;
+  client->status &= (uint32_t)~WS_THROTTLING;
   /* done sending, close connection if set to close */
   if ((client->status & WS_CLOSE) && (client->status & WS_SENDING))
     client->status = WS_CLOSE;
@@ -1053,8 +1053,8 @@ ws_parse_request (char *line, char **method, char **protocol)
     if ((rlen = proto - req) <= 0)
       return NULL;
 
-    request = xmalloc (rlen + 1);
-    strncpy (request, req, rlen);
+    request = xmalloc ((size_t)rlen + 1);
+    strncpy (request, req, (size_t)rlen);
     request[rlen] = 0;
 
     (*method) = strtoupper (xstrdup (meth));
@@ -1178,15 +1178,15 @@ parse_headers (WSHeaders * headers)
 
   while (line) {
     if ((next = strstr (line, "\r\n")) != NULL)
-      len = (next - line);
+      len = (int)(next - line);
     else
-      len = strlen (line);
+      len = (int32_t)strlen (line);
 
     if (len <= 0)
       return 1;
 
-    tmp = xmalloc (len + 1);
-    memcpy (tmp, line, len);
+    tmp = xmalloc ((size_t)len + 1);
+    memcpy (tmp, line, (size_t)len);
     tmp[len] = '\0';
 
     if (ws_set_header_fields (tmp, headers) == 1) {
@@ -1206,15 +1206,13 @@ parse_headers (WSHeaders * headers)
 
 /* Set into a queue the data that couldn't be sent. */
 static void
-ws_queue_sockbuf (WSClient * client, const char *buffer, int len, int bytes)
+ws_queue_sockbuf (WSClient * client, const char *buffer, unsigned int len, unsigned int bytes)
 {
   WSQueue *queue = xcalloc (1, sizeof (WSQueue));
 
-  if (bytes < 1)
-    bytes = 0;
 
-  queue->queued = xcalloc (len - bytes, sizeof (char));
-  memcpy (queue->queued, buffer + bytes, len - bytes);
+  queue->queued = xcalloc ((size_t)(len - bytes), sizeof (char));
+  memcpy (queue->queued, buffer + bytes, (size_t)(len - bytes));
   queue->qlen = len - bytes;
   client->sockqueue = queue;
 
@@ -1227,11 +1225,11 @@ ws_queue_sockbuf (WSClient * client, const char *buffer, int len, int bytes)
  * On error, -1 is returned and the connection status is set.
  * On success, the number of bytes read is returned. */
 static int
-read_plain_socket (WSClient * client, char *buffer, int size)
+read_plain_socket (WSClient * client, char *buffer, unsigned int size)
 {
   int bytes = 0;
 
-  bytes = recv (client->listener, buffer, size, 0);
+  bytes = recv (client->listener, buffer, (size_t)size, 0);
 
   if (bytes == -1 && (errno == EAGAIN || errno == EWOULDBLOCK))
     return ws_set_status (client, WS_READING, bytes);
@@ -1247,7 +1245,7 @@ read_plain_socket (WSClient * client, char *buffer, int size)
  * On error, -1 is returned and the connection status is set.
  * On success, the number of bytes read is returned. */
 static int
-read_socket (WSClient * client, char *buffer, int size)
+read_socket (WSClient * client, char *buffer, unsigned int size)
 {
 #ifdef HAVE_LIBSSL
   if (wsconfig.use_ssl)
@@ -1260,13 +1258,13 @@ read_socket (WSClient * client, char *buffer, int size)
 }
 
 static int
-send_plain_buffer (WSClient * client, const char *buffer, int len)
+send_plain_buffer (WSClient * client, const char *buffer, unsigned int len)
 {
-  return send (client->listener, buffer, len, 0);
+  return send (client->listener, buffer, (size_t)len, 0);
 }
 
 static int
-send_buffer (WSClient * client, const char *buffer, int len)
+send_buffer (WSClient * client, const char *buffer, unsigned int len)
 {
 #ifdef HAVE_LIBSSL
   if (wsconfig.use_ssl)
@@ -1283,7 +1281,7 @@ send_buffer (WSClient * client, const char *buffer, int len)
  * On error, -1 is returned and the connection status is set.
  * On success, the number of bytes sent is returned. */
 static int
-ws_respond_data (WSClient * client, const char *buffer, int len)
+ws_respond_data (WSClient * client, const char *buffer, unsigned int len)
 {
   int bytes = 0;
 
@@ -1293,7 +1291,7 @@ ws_respond_data (WSClient * client, const char *buffer, int len)
 
   /* did not send all of it... buffer it for a later attempt */
   if (bytes < len || (bytes == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)))
-    ws_queue_sockbuf (client, buffer, len, bytes);
+    ws_queue_sockbuf (client, buffer, len, (unsigned int)bytes);
 
   return bytes;
 }
@@ -1309,16 +1307,16 @@ ws_respond_cache (WSClient * client)
   int bytes = 0;
 
   bytes = send_buffer (client, queue->queued, queue->qlen);
-  if (bytes == -1 && errno == EPIPE)
+  if (bytes < 0 && errno == EPIPE)
     return ws_set_status (client, WS_ERR | WS_CLOSE, bytes);
 
-  if (bytes == -1 && (errno == EAGAIN || errno == EWOULDBLOCK))
+  if (bytes < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))
     return bytes;
 
-  if (chop_nchars (queue->queued, bytes, queue->qlen) == 0)
+  if (chop_nchars (queue->queued, (size_t)bytes, (size_t)queue->qlen) == 0)
     ws_clear_queue (client);
   else
-    queue->qlen -= bytes;
+    queue->qlen -= (unsigned int)bytes;
 
   return bytes;
 }
@@ -1328,11 +1326,11 @@ ws_respond_cache (WSClient * client)
  * On error, 1 is returned and the connection status is set.
  * On success, 0 is returned. */
 static int
-ws_realloc_send_buf (WSClient * client, const char *buf, int len)
+ws_realloc_send_buf (WSClient * client, const char *buf, unsigned int len)
 {
   WSQueue *queue = client->sockqueue;
   char *tmp = NULL;
-  int newlen = 0;
+  unsigned int newlen = 0;
 
   newlen = queue->qlen + len;
   tmp = realloc (queue->queued, newlen);
@@ -1341,7 +1339,7 @@ ws_realloc_send_buf (WSClient * client, const char *buf, int len)
     return ws_set_status (client, WS_ERR | WS_CLOSE, 1);
   }
   queue->queued = tmp;
-  memcpy (queue->queued + queue->qlen, buf, len);
+  memcpy (queue->queued + queue->qlen, buf, (size_t)len);
   queue->qlen += len;
 
   /* client probably  too slow, so stop queueing until everything is
@@ -1357,7 +1355,7 @@ ws_realloc_send_buf (WSClient * client, const char *buf, int len)
  * On error, 1 is returned and the connection status is set.
  * On success, the number of bytes sent is returned. */
 static int
-ws_respond (WSClient * client, const char *buffer, int len)
+ws_respond (WSClient * client, const char *buffer, unsigned int len)
 {
   int bytes = 0;
 
@@ -1384,12 +1382,12 @@ ws_respond (WSClient * client, const char *buffer, int len)
  *
  * On success, 0 is returned. */
 static int
-ws_send_frame (WSClient * client, WSOpcode opcode, const char *p, int sz)
+ws_send_frame (WSClient * client, WSOpcode opcode, const char *p, unsigned int sz)
 {
   unsigned char buf[32] = { 0 };
   char *frm = NULL;
   uint64_t payloadlen = 0, u64;
-  int hsize = 2;
+  unsigned int hsize = 2;
 
   if (sz < 126) {
     payloadlen = sz;
@@ -1405,21 +1403,21 @@ ws_send_frame (WSClient * client, WSOpcode opcode, const char *p, int sz)
   switch (payloadlen) {
   case WS_PAYLOAD_EXT16:
     buf[1] = WS_PAYLOAD_EXT16;
-    buf[2] = (sz & 0xff00) >> 8;
-    buf[3] = (sz & 0x00ff) >> 0;
+    buf[2] = (unsigned char)((sz & 0xff00) >> 8);
+    buf[3] = (unsigned char)((sz & 0x00ff) >> 0);
     break;
   case WS_PAYLOAD_EXT64:
     buf[1] = WS_PAYLOAD_EXT64;
-    u64 = htobe64 (sz);
+    u64 = htobe64 ((uint64_t)sz);
     memcpy (buf + 2, &u64, sizeof (uint64_t));
     break;
   default:
-    buf[1] = (sz & 0xff);
+    buf[1] = (unsigned char)(sz & 0xff);
   }
-  frm = xcalloc (hsize + sz, sizeof (unsigned char));
-  memcpy (frm, buf, hsize);
+  frm = xcalloc ((size_t)(hsize + sz), sizeof (unsigned char));
+  memcpy (frm, buf, (size_t)hsize);
   if (p != NULL && sz > 0)
-    memcpy (frm + hsize, p, sz);
+    memcpy (frm + hsize, p, (size_t)sz);
 
   ws_respond (client, frm, hsize + sz);
   free (frm);
@@ -1441,7 +1439,7 @@ ws_error (WSClient * client, unsigned short code, const char *err)
   code_be = htobe16 (code);
   memcpy (buf, &code_be, 2);
   if (err)
-    len += snprintf (buf + 2, sizeof buf - 4, "%s", err);
+    len += (unsigned int)snprintf (buf + 2, sizeof buf - 4, "%s", err);
 
   return ws_send_frame (client, WS_OPCODE_CLOSE, buf, len);
 }
@@ -1462,8 +1460,8 @@ access_log (WSClient * client, int status_code)
   strftime (buf, sizeof (buf) - 1, "[%d/%b/%Y:%H:%M:%S %z]",
             localtime (&tv.tv_sec));
 
-  elapsed = (client->end_proc.tv_sec - client->start_proc.tv_sec) * 1000.0;
-  elapsed += (client->end_proc.tv_usec - client->start_proc.tv_usec) / 1000.0;
+  elapsed = (uint32_t)((double)(client->end_proc.tv_sec - client->start_proc.tv_sec) * 1000.0);
+  elapsed += (uint32_t)((double)(client->end_proc.tv_usec - client->start_proc.tv_usec) / 1000.0);
 
   req = escape_http_request (hdrs->path);
   ref = escape_http_request (hdrs->referer);
@@ -1510,7 +1508,7 @@ ws_sha1_digest (const char *s, int len, unsigned char *digest)
   SHA1_CTX sha;
 
   SHA1Init (&sha);
-  SHA1Update (&sha, (uint8_t *) s, len);
+  SHA1Update (&sha, (uint8_t *) s, (unsigned int)len);
   SHA1Final (digest, &sha);
 }
 
@@ -1529,7 +1527,7 @@ ws_set_handshake_headers (WSHeaders * headers)
   memcpy (s, headers->ws_key, klen);
   memcpy (s + klen, WS_MAGIC_STR, mlen + 1);
 
-  ws_sha1_digest (s, len, digest);
+  ws_sha1_digest (s, (int)len, digest);
 
   /* set response headers */
   headers->ws_accept =
@@ -1581,7 +1579,8 @@ ws_send_handshake_headers (WSClient * client, WSHeaders * headers)
 static int
 ws_get_handshake (WSClient * client, WSServer * server)
 {
-  int bytes = 0, readh = 0;
+  int bytes = 0;
+  unsigned int readh = 0;
   char *buf = NULL;
 
   if (client->headers == NULL)
@@ -1595,7 +1594,7 @@ ws_get_handshake (WSClient * client, WSServer * server)
       http_error (client, WS_BAD_REQUEST_STR);
     return bytes;
   }
-  client->headers->buflen += bytes;
+  client->headers->buflen += (unsigned int)bytes;
 
   buf[client->headers->buflen] = '\0';  /* null-terminate */
 
@@ -1643,7 +1642,7 @@ ws_get_handshake (WSClient * client, WSServer * server)
  *
  * On success, 0 is returned. */
 int
-ws_send_data (WSClient * client, WSOpcode opcode, const char *p, int sz)
+ws_send_data (WSClient * client, WSOpcode opcode, const char *p, unsigned int sz)
 {
   char *buf = NULL;
 
@@ -1663,7 +1662,7 @@ ws_send_data (WSClient * client, WSOpcode opcode, const char *p, int sz)
  *
  * On success, the number of bytesr read is returned. */
 static int
-ws_read_header (WSClient * client, WSFrame * frm, int pos, int need)
+ws_read_header (WSClient * client, WSFrame * frm, unsigned int pos, unsigned int need)
 {
   char *buf = frm->buf;
   int bytes = 0;
@@ -1674,7 +1673,7 @@ ws_read_header (WSClient * client, WSFrame * frm, int pos, int need)
       ws_error (client, WS_CLOSE_UNEXPECTED, "Unable to read header");
     return bytes;
   }
-  frm->buflen += bytes;
+  frm->buflen += (unsigned int)bytes;
   frm->buf[frm->buflen] = '\0'; /* null-terminate */
 
   return bytes;
@@ -1684,7 +1683,7 @@ ws_read_header (WSClient * client, WSFrame * frm, int pos, int need)
  *
  * On success, the number of bytesr read is returned. */
 static int
-ws_read_payload (WSClient * client, WSMessage * msg, int pos, int need)
+ws_read_payload (WSClient * client, WSMessage * msg, unsigned int pos, unsigned int need)
 {
   char *buf = msg->payload;
   int bytes = 0;
@@ -1695,8 +1694,8 @@ ws_read_payload (WSClient * client, WSMessage * msg, int pos, int need)
       ws_error (client, WS_CLOSE_UNEXPECTED, "Unable to read payload");
     return bytes;
   }
-  msg->buflen += bytes;
-  msg->payloadsz += bytes;
+  msg->buflen += (unsigned int)bytes;
+  msg->payloadsz += (unsigned int)bytes;
 
   return bytes;
 }
@@ -1724,13 +1723,13 @@ ws_set_front_header_fields (WSClient * client)
 
 /* Unmask the payload given the current frame's masking key. */
 static void
-ws_unmask_payload (char *buf, int len, int offset, unsigned char mask[])
+ws_unmask_payload (char *buf, unsigned int len, unsigned int offset, unsigned char mask[])
 {
-  int i, j = 0;
+  unsigned int i, j = 0;
 
   /* unmask data */
   for (i = offset; i < len; ++i, ++j) {
-    buf[i] ^= mask[j % 4];
+    buf[i] ^= (char)mask[j % 4];
   }
 }
 
@@ -1774,7 +1773,7 @@ ws_handle_ping (WSClient * client)
   WSFrame **frm = &client->frame;
   WSMessage **msg = &client->message;
   char *buf = NULL, *tmp = NULL;
-  int pos = 0, len = (*frm)->payloadlen, newlen = 0;
+  unsigned int pos = 0, len = (*frm)->payloadlen, newlen = 0;
 
   /* RFC states that Control frames themselves MUST NOT be
    * fragmented. */
@@ -1798,15 +1797,15 @@ ws_handle_ping (WSClient * client)
 
   /* Copy the ping payload */
   pos = (*msg)->payloadsz - len;
-  buf = xcalloc (len, sizeof (char));
-  memcpy (buf, (*msg)->payload + pos, len);
+  buf = xcalloc ((size_t)len, sizeof (char));
+  memcpy (buf, (*msg)->payload + pos, (size_t)len);
 
   /* Unmask it */
   ws_unmask_payload (buf, len, 0, (*frm)->mask);
 
   /* Resize the current payload (keep an eye on this realloc) */
   newlen = (*msg)->payloadsz - len;
-  tmp = realloc ((*msg)->payload, newlen);
+  tmp = realloc ((*msg)->payload, (size_t)newlen);
   if (tmp == NULL && newlen > 0) {
     free ((*msg)->payload);
     free (buf);
@@ -1834,7 +1833,7 @@ ws_handle_ping (WSClient * client)
  * On error, or if the message is invalid, 1 is returned.
  * On success, or if the message is valid, 0 is returned. */
 int
-ws_validate_string (const char *str, int len)
+ws_validate_string (const char *str, unsigned int len)
 {
   uint32_t state = UTF8_VALID;
 
@@ -1856,7 +1855,7 @@ ws_handle_text_bin (WSClient * client, WSServer * server)
 {
   WSFrame **frm = &client->frame;
   WSMessage **msg = &client->message;
-  int offset = (*msg)->mask_offset;
+  unsigned int offset = (*msg)->mask_offset;
 
   /* All data frames after the initial data frame must have opcode 0 */
   if ((*msg)->fragmented && (*frm)->opcode != WS_OPCODE_CONTINUATION) {
@@ -1927,6 +1926,8 @@ ws_manage_payload_opcode (WSClient * client, WSServer * server)
     LOG (("PING\n"));
     ws_handle_ping (client);
     break;
+  case WS_OPCODE_END:
+  case WS_OPCODE_CLOSE:
   default:
     LOG (("CLOSE\n"));
     ws_handle_close (client);
@@ -1935,7 +1936,7 @@ ws_manage_payload_opcode (WSClient * client, WSServer * server)
 
 /* Set the extended payload length into the given pointer. */
 static void
-ws_set_extended_header_size (const char *buf, int *extended)
+ws_set_extended_header_size (const char *buf, unsigned int *extended)
 {
   uint64_t payloadlen = 0;
   /* determine the payload length, else read more data */
@@ -1946,6 +1947,8 @@ ws_set_extended_header_size (const char *buf, int *extended)
     break;
   case WS_PAYLOAD_EXT64:
     *extended = 8;
+    break;
+  default:
     break;
   }
 }
@@ -1966,10 +1969,10 @@ ws_set_payloadlen (WSFrame * frm, const char *buf)
     break;
   case WS_PAYLOAD_EXT64:
     memcpy (&len64, (buf + 2), sizeof (uint64_t));
-    frm->payloadlen = be64toh (len64);
+    frm->payloadlen = (unsigned int)be64toh (len64);
     break;
   default:
-    frm->payloadlen = payloadlen;
+    frm->payloadlen = (unsigned int)payloadlen;
   }
 }
 
@@ -2003,7 +2006,8 @@ static int
 ws_get_frm_header (WSClient * client)
 {
   WSFrame **frm = NULL;
-  int bytes = 0, readh = 0, need = 0, offset = 0, extended = 0;
+  int bytes = 0;
+  unsigned int readh = 0, need = 0, offset = 0, extended = 0;
 
   if (client->frame == NULL)
     client->frame = new_wsframe ();
@@ -2072,8 +2076,8 @@ ws_realloc_frm_payload (WSFrame * frm, WSMessage * msg)
   char *tmp = NULL;
   uint64_t newlen = 0;
 
-  newlen = msg->payloadsz + frm->payloadlen;
-  tmp = realloc (msg->payload, newlen);
+  newlen = (uint64_t)(msg->payloadsz + frm->payloadlen);
+  tmp = realloc (msg->payload, (size_t)newlen);
   if (tmp == NULL && newlen > 0) {
     free (msg->payload);
     msg->payload = NULL;
@@ -2095,7 +2099,8 @@ ws_get_frm_payload (WSClient * client, WSServer * server)
 {
   WSFrame **frm = NULL;
   WSMessage **msg = NULL;
-  int bytes = 0, readh = 0, need = 0;
+  int bytes = 0;
+  unsigned readh = 0, need = 0;
 
   if (client->message == NULL)
     client->message = new_wsmessage ();
@@ -2105,7 +2110,7 @@ ws_get_frm_payload (WSClient * client, WSServer * server)
 
   /* message within the same frame */
   if ((*msg)->payload == NULL && (*frm)->payloadlen)
-    (*msg)->payload = xcalloc ((*frm)->payloadlen, sizeof (char));
+    (*msg)->payload = xcalloc ((size_t)(*frm)->payloadlen, sizeof (char));
   /* handle a new frame */
   else if ((*msg)->buflen == 0 && (*frm)->payloadlen) {
     if (ws_realloc_frm_payload ((*frm), (*msg)) == 1)
@@ -2288,7 +2293,7 @@ handle_writes (int conn, WSServer * server)
   ws_respond (client, NULL, 0); /* buffered data */
   /* done sending data */
   if (client->sockqueue == NULL)
-    client->status &= ~WS_SENDING;
+    client->status &= (uint32_t)~WS_SENDING;
 
   /* An error ocurred while sending data or while reading data but still
    * waiting from the last send() from the server to the client.  e.g.,
@@ -2405,14 +2410,14 @@ clear_fifo_queue (WSPipeOut * pipeout)
  * reopened.
  * On success, 0 is returned. */
 static int
-ws_realloc_fifobuf (WSPipeOut * pipeout, const char *buf, int len)
+ws_realloc_fifobuf (WSPipeOut * pipeout, const char *buf, unsigned int len)
 {
   WSQueue *queue = pipeout->fifoqueue;
   char *tmp = NULL;
-  int newlen = 0;
+  unsigned int newlen = 0;
 
   newlen = queue->qlen + len;
-  tmp = realloc (queue->queued, newlen);
+  tmp = realloc (queue->queued, (size_t)newlen);
   if (tmp == NULL && newlen > 0) {
     close (pipeout->fd);
     clear_fifo_queue (pipeout);
@@ -2421,7 +2426,7 @@ ws_realloc_fifobuf (WSPipeOut * pipeout, const char *buf, int len)
   }
 
   queue->queued = tmp;
-  memcpy (queue->queued + queue->qlen, buf, len);
+  memcpy (queue->queued + queue->qlen, buf, (size_t)len);
   queue->qlen += len;
 
   return 0;
@@ -2430,12 +2435,9 @@ ws_realloc_fifobuf (WSPipeOut * pipeout, const char *buf, int len)
 /* Set into a queue the data that couldn't be sent in the outgoing
  * FIFO. */
 static void
-ws_queue_fifobuf (WSPipeOut * pipeout, const char *buffer, int len, int bytes)
+ws_queue_fifobuf (WSPipeOut * pipeout, const char *buffer, unsigned int len, unsigned int bytes)
 {
   WSQueue **queue = &pipeout->fifoqueue;
-
-  if (bytes < 1)
-    bytes = 0;
 
   (*queue) = xcalloc (1, sizeof (WSQueue));
   (*queue)->queued = xcalloc (len - bytes, sizeof (char));
@@ -2450,11 +2452,11 @@ ws_queue_fifobuf (WSPipeOut * pipeout, const char *buffer, int len, int bytes)
  * On error, the data is queued up.
  * On success, the number of bytes sent is returned. */
 static int
-ws_write_fifo_data (WSPipeOut * pipeout, char *buffer, int len)
+ws_write_fifo_data (WSPipeOut * pipeout, char *buffer, unsigned int len)
 {
   int bytes = 0;
 
-  bytes = write (pipeout->fd, buffer, len);
+  bytes = (int)write (pipeout->fd, buffer, (size_t)len);
 
   /* At this point, the reader probably closed the pipe, so a cheap *hack* for
    * this is to close the pipe on our end and attempt to reopen it. If unable to
@@ -2465,7 +2467,12 @@ ws_write_fifo_data (WSPipeOut * pipeout, char *buffer, int len)
     return bytes;
   }
   if (bytes < len || (bytes == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)))
-    ws_queue_fifobuf (pipeout, buffer, len, bytes);
+  {
+      if (bytes < 1)
+        bytes = 0;
+      ws_queue_fifobuf (pipeout, buffer, len, (unsigned int)bytes);
+  }
+
 
   return bytes;
 }
@@ -2481,7 +2488,7 @@ ws_write_fifo_cache (WSPipeOut * pipeout)
   WSQueue *queue = pipeout->fifoqueue;
   int bytes = 0;
 
-  bytes = write (pipeout->fd, queue->queued, queue->qlen);
+  bytes = (int)write (pipeout->fd, queue->queued, (size_t)queue->qlen);
 
   /* At this point, the reader probably closed the pipe, so a cheap *hack* for
    * this is to close the pipe on our end and attempt to reopen it. If unable to
@@ -2492,10 +2499,10 @@ ws_write_fifo_cache (WSPipeOut * pipeout)
     return bytes;
   }
 
-  if (chop_nchars (queue->queued, bytes, queue->qlen) == 0)
+  if (chop_nchars (queue->queued, (size_t)bytes, (size_t)queue->qlen) == 0)
     clear_fifo_queue (pipeout);
   else
-    queue->qlen -= bytes;
+    queue->qlen -= (unsigned int)bytes; // TODO: what about -1?
 
   return bytes;
 }
@@ -2505,7 +2512,7 @@ ws_write_fifo_cache (WSPipeOut * pipeout)
  *
  * On success, the number of bytes sent is returned. */
 int
-ws_write_fifo (WSPipeOut * pipeout, char *buffer, int len)
+ws_write_fifo (WSPipeOut * pipeout, char *buffer, unsigned int len)
 {
   int bytes = 0;
 
@@ -2526,7 +2533,7 @@ ws_write_fifo (WSPipeOut * pipeout, char *buffer, int len)
   }
 
   if (pipeout->fifoqueue == NULL)
-    pipeout->status &= ~WS_SENDING;
+    pipeout->status &= (uint32_t)~WS_SENDING;
 
   return bytes;
 }
@@ -2585,16 +2592,16 @@ ws_send_strict_fifo_to_client (WSServer * server, int listener, WSPacket * pa)
  * On error, -1 is returned.
  * On success, the number of bytes read is returned. */
 int
-ws_read_fifo (int fd, char *buf, int *buflen, int pos, int need)
+ws_read_fifo (int fd, char *buf, unsigned int *buflen, unsigned int pos, unsigned int need)
 {
   int bytes = 0;
 
-  bytes = read (fd, buf + pos, need);
+  bytes = (int)read (fd, buf + pos, (size_t)need);
   if (bytes == -1 && (errno == EAGAIN || errno == EWOULDBLOCK))
     return bytes;
   else if (bytes == -1)
     return bytes;
-  *buflen += bytes;
+  *buflen += (unsigned int)bytes;
 
   return bytes;
 }
@@ -2656,7 +2663,8 @@ handle_strict_fifo (WSServer * server)
 {
   WSPipeIn *pi = server->pipein;
   WSPacket **pa = &pi->packet;
-  int bytes = 0, readh = 0, need = 0;
+  int bytes = 0;
+  unsigned int readh = 0, need = 0;
 
   char *ptr = NULL;
   uint32_t listener = 0, type = 0, size = 0;
@@ -2676,7 +2684,7 @@ handle_strict_fifo (WSServer * server)
   ptr += unpack_uint32 (ptr, &type);
   ptr += unpack_uint32 (ptr, &size);
 
-  if (validate_fifo_packet (listener, type, size) == 1) {
+  if (validate_fifo_packet (listener, type, (int)size) == 1) {
     close (pi->fd);
     clear_fifo_packet (pi);
     ws_openfifo_in (pi);
@@ -2709,7 +2717,7 @@ handle_strict_fifo (WSServer * server)
   /* Either send it to a specific client or brodcast message to all
    * clients */
   if (listener != 0)
-    ws_send_strict_fifo_to_client (server, listener, *pa);
+    ws_send_strict_fifo_to_client (server, (int)listener, *pa);
   else
     list_foreach (server->colist, ws_broadcast_fifo, *pa);
   clear_fifo_packet (pi);
@@ -2726,16 +2734,16 @@ handle_fixed_fifo (WSServer * server)
   int bytes = 0;
   char buf[PIPE_BUF] = { 0 };
 
-  if ((bytes = read (pi->fd, buf, PIPE_BUF)) < 0)
+  if ((bytes = (int)read (pi->fd, buf, PIPE_BUF)) < 0)
     return;
 
   buf[bytes] = '\0';    /* null-terminate */
-  if (ws_validate_string (buf, bytes) != 0)
+  if (ws_validate_string (buf, (unsigned int)bytes) != 0)
     return;
 
   (*pa) = xcalloc (1, sizeof (WSPacket));
   (*pa)->type = WS_OPCODE_TEXT;
-  (*pa)->size = bytes;
+  (*pa)->size = (uint32_t)bytes;
   (*pa)->data = xstrdup (buf);
 
   /* no clients to send data to */

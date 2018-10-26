@@ -154,7 +154,7 @@ typedef enum WSOPCODE
 typedef struct WSQueue_
 {
   char *queued;                 /* queue data */
-  int qlen;                     /* queue length */
+  unsigned int qlen;                     /* queue length */
 } WSQueue;
 
 typedef struct WSPacket_
@@ -162,14 +162,14 @@ typedef struct WSPacket_
   uint32_t type;                /* packet type (fixed-size) */
   uint32_t size;                /* payload size in bytes (fixed-size) */
   char *data;                   /* payload */
-  int len;                      /* payload buffer len */
+  unsigned int len;             /* payload buffer len */
 } WSPacket;
 
 /* WS HTTP Headers */
 typedef struct WSHeaders_
 {
   int reading;
-  int buflen;
+  unsigned int buflen;
   char buf[BUFSIZ + 1];
 
   char *agent;
@@ -197,15 +197,15 @@ typedef struct WSFrame_
   unsigned char fin;            /* frame fin flag */
   unsigned char mask[4];        /* mask key */
   uint8_t res;                  /* extensions */
-  int payload_offset;           /* end of header/start of payload */
-  int payloadlen;               /* payload length (for each frame) */
+  unsigned int payload_offset;           /* end of header/start of payload */
+  unsigned int payloadlen;      /* payload length (for each frame) */
 
   /* status flags */
   int reading;                  /* still reading frame's header part? */
   int masking;                  /* are we masking the frame? */
 
   char buf[WS_FRM_HEAD_SZ + 1]; /* frame's header */
-  int buflen;                   /* recv'd buf length so far (for each frame) */
+  unsigned int buflen;          /* recv'd buf length so far (for each frame) */
 } WSFrame;
 
 /* A WebSocket Message */
@@ -213,11 +213,11 @@ typedef struct WSMessage_
 {
   WSOpcode opcode;              /* frame opcode */
   int fragmented;               /* reading a fragmented frame */
-  int mask_offset;              /* for fragmented frames */
+  unsigned int mask_offset;              /* for fragmented frames */
 
   char *payload;                /* payload message */
-  int payloadsz;                /* total payload size (whole message) */
-  int buflen;                   /* recv'd buf length so far (for each frame) */
+  unsigned int payloadsz;                /* total payload size (whole message) */
+  unsigned int buflen;                   /* recv'd buf length so far (for each frame) */
 } WSMessage;
 
 /* FD event states */
@@ -260,7 +260,7 @@ typedef struct WSPipeIn_
   WSEState *state;              /* FDs states */
 
   char hdr[HDR_SIZE];           /* FIFO header's buffer */
-  int hlen;
+  unsigned int hlen;
 } WSPipeIn;
 
 /* Pipe Out */
@@ -315,11 +315,11 @@ typedef struct WSServer_
 #endif
 } WSServer;
 
-int ws_read_fifo (int fd, char *buf, int *buflen, int pos, int need);
-int ws_send_data (WSClient * client, WSOpcode opcode, const char *p, int sz);
+int ws_read_fifo (int fd, char *buf, unsigned int *buflen, unsigned int pos, unsigned int need);
+int ws_send_data (WSClient * client, WSOpcode opcode, const char *p, unsigned int sz);
 int ws_setfifo (const char *pipename);
-int ws_validate_string (const char *str, int len);
-int ws_write_fifo (WSPipeOut * pipeout, char *buffer, int len);
+int ws_validate_string (const char *str, unsigned int len);
+int ws_write_fifo (WSPipeOut * pipeout, char *buffer, unsigned int len);
 size_t pack_uint32 (void *buf, uint32_t val);
 size_t unpack_uint32 (const void *buf, uint32_t * val);
 void set_nonblocking (int listener);

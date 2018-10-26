@@ -33,5 +33,6 @@ AM_CFLAGS += -Wmissing-prototypes -Wstrict-prototypes -Wmissing-declarations
 AM_CFLAGS += -Wwrite-strings -Wshadow -Wpointer-arith -Wsign-compare
 AM_CFLAGS += -Wredundant-decls -Wbad-function-cast -Winline -Wcast-align -Wextra
 AM_CFLAGS += -Wdeclaration-after-statement -Wno-missing-field-initializers
+AM_CFLAGS += -Wswitch-default -Wconversion -Wswitch-enum
 
 dist_man_MANS = gwsocket.1
